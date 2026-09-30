@@ -6,7 +6,7 @@
 //
 // Engine version : 4.7.2-stable
 // Build flags    : -DDEBUG_ENABLED -DNDEBUG -DTOOLS_ENABLED
-// Layout id      : 5922183044973855246
+// Layout id      : 10464210547315203732
 //
 // Offsets depend on the engine version AND on which #ifdefs (TOOLS_ENABLED,
 // DEBUG_ENABLED, ...) were active. `verify_layout()` cross-checks the entries
@@ -23,7 +23,7 @@ namespace gdscript_disassemble {
 // Identifies the engine build this table was generated from.
 inline constexpr const char *kLayoutEngineVersion = "4.7.2";
 inline constexpr const char *kLayoutBuildFlags = "-DDEBUG_ENABLED -DNDEBUG -DTOOLS_ENABLED";
-inline constexpr unsigned long long kLayoutId = 5922183044973855246ULL;
+inline constexpr unsigned long long kLayoutId = 10464210547315203732ULL;
 
 struct EngineLayout {
 	size_t kSize_Object = 336;  // sizeof(Object)
@@ -52,6 +52,7 @@ struct EngineLayout {
 	size_t kOff_GDScriptFunction_name = 0;  // offsetof(GDScriptFunction, name)
 	size_t kOff_GDScriptFunction_method_info = 88;  // offsetof(GDScriptFunction, method_info)
 	size_t kOff_GDScriptFunction__script = 232;  // offsetof(GDScriptFunction, _script)
+	size_t kOff_GDScriptFunction__static = 16;  // offsetof(GDScriptFunction, _static)
 	size_t kOff_GDScriptFunction__initial_line = 240;  // offsetof(GDScriptFunction, _initial_line)
 	size_t kOff_GDScriptFunction__argument_count = 244;  // offsetof(GDScriptFunction, _argument_count)
 	size_t kOff_GDScriptFunction__vararg_index = 248;  // offsetof(GDScriptFunction, _vararg_index)
@@ -117,6 +118,7 @@ inline constexpr EngineLayout kLayout = {
 	.kOff_GDScriptFunction_name = 0,
 	.kOff_GDScriptFunction_method_info = 88,
 	.kOff_GDScriptFunction__script = 232,
+	.kOff_GDScriptFunction__static = 16,
 	.kOff_GDScriptFunction__initial_line = 240,
 	.kOff_GDScriptFunction__argument_count = 244,
 	.kOff_GDScriptFunction__vararg_index = 248,

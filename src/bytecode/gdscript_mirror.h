@@ -108,6 +108,9 @@ public:
 	using RawView::RawView;
 
 	StringName get_name() const { return at<StringName>(kLayout.kOff_GDScriptFunction_name); }
+	// A static function compiles to the same instructions as an instance one when
+	// neither touches `self`, so this is the only way to tell them apart.
+	bool is_static() const { return at<bool>(kLayout.kOff_GDScriptFunction__static); }
 	const void *get_script() const { return at<const void *>(kLayout.kOff_GDScriptFunction__script); }
 	int get_initial_line() const { return at<int>(kLayout.kOff_GDScriptFunction__initial_line); }
 	int get_argument_count() const { return at<int>(kLayout.kOff_GDScriptFunction__argument_count); }

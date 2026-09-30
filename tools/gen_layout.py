@@ -104,6 +104,7 @@ PROBES = [
     ("OFFSET", "GDScriptFunction", "name"),
     ("OFFSET", "GDScriptFunction", "method_info"),
     ("OFFSET", "GDScriptFunction", "_script"),
+    ("OFFSET", "GDScriptFunction", "_static"),
     ("OFFSET", "GDScriptFunction", "_initial_line"),
     ("OFFSET", "GDScriptFunction", "_argument_count"),
     ("OFFSET", "GDScriptFunction", "_vararg_index"),

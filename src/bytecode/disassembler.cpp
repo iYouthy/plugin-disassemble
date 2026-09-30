@@ -517,6 +517,7 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 	listing.name = p_function.get_name();
 	listing.argument_count = p_function.get_argument_count();
 	listing.is_vararg = p_function.is_vararg();
+	listing.is_static = p_function.is_static();
 	listing.initial_line = p_function.get_initial_line();
 
 	const int *code = p_function.code();
@@ -739,6 +740,9 @@ bool disassemble_script(Script *p_script, String &r_text, String &r_error) {
 		const FunctionListing listing = disassemble_function(E.function, owner, E.path);
 
 		String signature = E.path;
+		if (listing.is_static) {
+			signature = String("static ") + signature;
+		}
 		if (!listing.ok) {
 			any_decode_failure = true;
 		}

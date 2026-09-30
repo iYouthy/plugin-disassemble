@@ -88,6 +88,14 @@ func _initialize() -> void:
 		if not r.is_empty():
 			failures.append("operand self-test on %s:\n%s" % [name, r])
 
+	# static 必须显示出来：它不产生额外指令，所以渲染层是唯一能区分的地方。
+	# （写这段时故意把 a/b 对调跑过一次，确认断言真的会失败。）
+	var statics: String = dumper.disassemble(load("res://tests/statics.gd"))
+	if not statics.contains("--- static a ---"):
+		failures.append("static function not marked: expected '--- static b ---'")
+	if statics.contains("--- static b ---"):
+		failures.append("non-static function marked static")
+
 	if failures.is_empty():
 		print("NESTED OK")
 	else:
