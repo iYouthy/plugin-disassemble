@@ -382,7 +382,18 @@ struct Renderer {
 			case OPCODE_RETURN_TYPED_BUILTIN:
 				return "return " + addr(p_ip, 1) + String(" as ") + type_name(a2);
 			case OPCODE_RETURN_TYPED_NATIVE:
-				return "return " + addr(p_ip, 1) + String(" as native ") + gname(func, a2);
+				// Slot 2 is an address holding the native class constant, not a
+				// global-name index -- the engine prints it as DADDR(2).
+				return "return " + addr(p_ip, 1) + String(" as native ") + addr(p_ip, 2);
+			case OPCODE_RETURN_TYPED_ARRAY:
+			case OPCODE_RETURN_TYPED_DICTIONARY:
+				// The instruction also carries the element (or key/value) type
+				// descriptors, but the engine's own disassembler does not read
+				// them -- it prints only the value. Showing the type would mean
+				// deriving those slots from the VM rather than from the
+				// disassembler, so this matches the engine rather than guessing.
+				return "return " + addr(p_ip, 1) +
+						(p_op == OPCODE_RETURN_TYPED_ARRAY ? String(" as Array") : String(" as Dictionary"));
 			case OPCODE_RETURN_TYPED_SCRIPT:
 				return "return " + addr(p_ip, 1) + String(" as script ") + quote_variant(func.get_constant(a2 & kAddrMask));
 
@@ -453,9 +464,11 @@ struct Renderer {
 					String(" end ") + String::num_int64(slot(p_ip, 6));
 		}
 		if (p_op == OPCODE_ITERATE_RANGE) {
-			// One slot narrower than the for-init form.
+			// One slot narrower than the for-init form, and there is no second
+			// bound: the engine prints `in range to <to> step <step>`. Reading the
+			// step as an upper bound -- which this did -- is a different operand.
 			// [op][counter][to][step][dst][end]
-			return "for " + addr(p_ip, 4) + String(" in range ") + addr(p_ip, 2) + String("..") + addr(p_ip, 3) +
+			return "for " + addr(p_ip, 4) + String(" in range to ") + addr(p_ip, 2) +
 					String(" step ") + addr(p_ip, 3) + String(" counter ") + addr(p_ip, 1) +
 					String(" end ") + String::num_int64(slot(p_ip, 5));
 		}

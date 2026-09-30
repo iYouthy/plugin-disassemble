@@ -45,6 +45,19 @@ func _initialize() -> void:
 	else:
 		for f in failures:
 			print("NESTED FAIL: ", f)
+	# 迭代与带类型的返回：这两个操作数位置曾经用错（步长被当成上界）。
+	var iter: String = dumper.disassemble(load("res://tests/example.gd"))
+	if not iter.contains("in range to "):
+		failures.append("ITERATE_RANGE not rendered with 'in range to'")
+	# RETURN_TYPED_* only appears when a conversion is genuinely needed at the
+	# return, which the fixtures do not reliably trigger -- `return []` for an
+	# `Array[Node]` result needs none. So this checks the shape only if such an
+	# instruction actually shows up, instead of demanding one exist.
+	for name in ["example", "constructs", "objects", "nested"]:
+		for line in dumper.disassemble(load("res://tests/%s.gd" % name)).split("\n"):
+			if line.contains("return typed") and not line.contains(" as "):
+				failures.append("typed return rendered oddly: " + line.strip_edges())
+
 	# 渲染退化探针：槽位算错会导致索引越界，渲染就退化成这些占位符形式。
 	# 这是"操作数位置是否与引擎一致"最直接的检验。
 	for fb in ["member(#", "type(#", "ctor#", "utility#", "bind#", "lambda#", "<decode failed", "<err>"]:
