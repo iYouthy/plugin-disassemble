@@ -28,6 +28,10 @@ public:
 	bool is_layout_supported() const;
 
 	String get_layout_info() const;
+
+	// Test hook: checks the hand-written fixed-shape rendering cases against the
+	// operand reads the engine declares. Returns "" when everything agreed.
+	String self_test(const Ref<Script> &p_script) const;
 };
 
 } // namespace godot

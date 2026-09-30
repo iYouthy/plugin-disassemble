@@ -66,4 +66,11 @@ func _initialize() -> void:
 			if text.contains(fb):
 				failures.append("unresolved '%s' in %s" % [fb, name])
 
+	# 操作数自检：把渲染器实际读取的槽位/类型与引擎声明的比对。这条抓到过
+	# ASSIGN_TYPED_ARRAY / _DICTIONARY 完全没有实现（掉进原始槽位转储）。
+	for name in ["example", "constructs", "nested", "objects", "tool_script", "empty"]:
+		var r: String = dumper.self_test(load("res://tests/%s.gd" % name))
+		if not r.is_empty():
+			failures.append("operand self-test on %s:\n%s" % [name, r])
+
 	quit(0 if failures.is_empty() else 1)

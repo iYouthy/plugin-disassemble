@@ -47,6 +47,15 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 // stream), in which case r_text holds the explanation instead of a listing.
 bool disassemble_script(Script *p_script, String &r_text, String &r_error);
 
+// Verifies the hand-written fixed-shape cases against the operand reads the
+// engine declares, using the generated fixed_plan. Returns an empty string when
+// every instruction agreed, or a report of the ones that did not.
+//
+// This is a test hook, deliberately separate from rendering: an earlier attempt
+// embedded the comparison in the render path and it made normal output
+// unreadable when it mis-fired.
+String check_fixed_operands(Script *p_script);
+
 // Renders an address operand (`index | type << 24`) the way the engine's own
 // disassembler does: self / stack(n) / const(...) / member(...).
 String render_address(const ScriptMirror &p_script, const FunctionView &p_function, int p_operand);

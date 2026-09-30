@@ -99,13 +99,30 @@ struct Renderer {
 	Renderer(const FunctionView &p_func, const ScriptMirror &p_script, const int *p_code, int p_count) :
 			func(p_func), script(p_script), code(p_code), count(p_count) {}
 
-	int slot(int p_ip, int p_offset) const {
+	// Read tracking, used only by the operand self-test. `addr` deliberately does
+	// not route through `slot`: doing that would record every address read as an
+	// int read as well, and the comparison against the engine's declared kinds
+	// would then fail on every instruction.
+	mutable uint32_t read_addr = 0;
+	mutable uint32_t read_imm = 0;
+
+	static uint32_t bit(int p_offset) {
+		return (p_offset >= 0 && p_offset < 32) ? (1u << p_offset) : 0u;
+	}
+
+	int raw(int p_ip, int p_offset) const {
 		const int at = p_ip + p_offset;
 		return (at >= 0 && at < count) ? code[at] : 0;
 	}
 
+	int slot(int p_ip, int p_offset) const {
+		read_imm |= bit(p_offset);
+		return raw(p_ip, p_offset);
+	}
+
 	String addr(int p_ip, int p_offset) const {
-		return render_address(script, func, slot(p_ip, p_offset));
+		read_addr |= bit(p_offset);
+		return render_address(script, func, raw(p_ip, p_offset));
 	}
 
 	// The argument list of a variadic instruction. argc is not N: N also covers
@@ -162,10 +179,9 @@ struct Renderer {
 
 	// `ip` here is the opcode slot, matching the engine's own indexing.
 	String render(int p_op, int p_ip) {
-		const int a1 = slot(p_ip, 1);
-		const int a2 = slot(p_ip, 2);
-		const int a3 = slot(p_ip, 3);
-
+		// Operands are fetched lazily, per case. Reading them up front marked
+		// slots 1..3 as read for *every* instruction, which is what made the
+		// operand self-test report every instruction as disagreeing.
 		switch (p_op) {
 			case OPCODE_OPERATOR:
 				return addr(p_ip, 3) + String(" = ") + addr(p_ip, 1) + String(" ") +
@@ -179,6 +195,14 @@ struct Renderer {
 
 			case OPCODE_ASSIGN:
 				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2);
+			case OPCODE_ASSIGN_TYPED_ARRAY:
+			case OPCODE_ASSIGN_TYPED_DICTIONARY:
+				// Found by the operand self-test: these had no case at all and
+				// fell through to the raw-slot dump. The engine reads only the two
+				// addresses here -- the element/key/value descriptors live in the
+				// remaining slots and its own disassembler ignores them too.
+				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) +
+						(p_op == OPCODE_ASSIGN_TYPED_ARRAY ? String("  (typed array)") : String("  (typed dictionary)"));
 			case OPCODE_ASSIGN_NULL:
 				return addr(p_ip, 1) + String(" = null");
 			case OPCODE_ASSIGN_TRUE:
@@ -189,32 +213,32 @@ struct Renderer {
 			case OPCODE_ASSIGN_TYPED_BUILTIN:
 			case OPCODE_CAST_TO_BUILTIN:
 				return addr(p_ip, p_op == OPCODE_CAST_TO_BUILTIN ? 1 : 1) + String(" = ") +
-						addr(p_ip, 2) + String(" as ") + type_name(a3) + (p_op == OPCODE_CAST_TO_BUILTIN ? " (cast)" : "");
+						addr(p_ip, 2) + String(" as ") + type_name(slot(p_ip, 3)) + (p_op == OPCODE_CAST_TO_BUILTIN ? " (cast)" : "");
 			case OPCODE_ASSIGN_TYPED_NATIVE:
 			case OPCODE_CAST_TO_NATIVE:
 				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" as native ") +
-						quote_variant(func.get_constant(a3 & kAddrMask));
+						quote_variant(func.get_constant(slot(p_ip, 3) & kAddrMask));
 			case OPCODE_ASSIGN_TYPED_SCRIPT:
 			case OPCODE_CAST_TO_SCRIPT:
 				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" as script ") +
-						quote_variant(func.get_constant(a3 & kAddrMask));
+						quote_variant(func.get_constant(slot(p_ip, 3) & kAddrMask));
 
 			case OPCODE_TYPE_TEST_BUILTIN:
-				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" is ") + type_name(a3);
+				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" is ") + type_name(slot(p_ip, 3));
 			case OPCODE_TYPE_TEST_NATIVE:
-				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" is native ") + gname(func, a3);
+				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" is native ") + gname(func, slot(p_ip, 3));
 			case OPCODE_TYPE_TEST_SCRIPT:
 				return addr(p_ip, 1) + String(" = ") + addr(p_ip, 2) + String(" is script ") +
-						quote_variant(func.get_constant(a3 & kAddrMask));
+						quote_variant(func.get_constant(slot(p_ip, 3) & kAddrMask));
 
 			case OPCODE_GET_MEMBER:
-				return addr(p_ip, 1) + String(" = ") + gname(func, a2);
+				return addr(p_ip, 1) + String(" = ") + gname(func, slot(p_ip, 2));
 			case OPCODE_SET_MEMBER:
-				return gname(func, a2) + String(" = ") + addr(p_ip, 1);
+				return gname(func, slot(p_ip, 2)) + String(" = ") + addr(p_ip, 1);
 			case OPCODE_GET_STATIC_VARIABLE:
-				return addr(p_ip, 1) + String(" = static#") + String::num_int64(a3);
+				return addr(p_ip, 1) + String(" = static#") + String::num_int64(slot(p_ip, 3));
 			case OPCODE_SET_STATIC_VARIABLE:
-				return String("static#") + String::num_int64(a3) + String(" = ") + addr(p_ip, 1);
+				return String("static#") + String::num_int64(slot(p_ip, 3)) + String(" = ") + addr(p_ip, 1);
 
 			case OPCODE_GET_KEYED:
 				return addr(p_ip, 3) + String(" = ") + addr(p_ip, 1) + String("[") + addr(p_ip, 2) + String("]");
@@ -229,10 +253,10 @@ struct Renderer {
 
 			case OPCODE_GET_NAMED:
 			case OPCODE_GET_NAMED_VALIDATED:
-				return addr(p_ip, 2) + String(" = ") + addr(p_ip, 1) + String(".") + gname(func, a3);
+				return addr(p_ip, 2) + String(" = ") + addr(p_ip, 1) + String(".") + gname(func, slot(p_ip, 3));
 			case OPCODE_SET_NAMED:
 			case OPCODE_SET_NAMED_VALIDATED:
-				return addr(p_ip, 1) + String(".") + gname(func, a3) + String(" = ") + addr(p_ip, 2);
+				return addr(p_ip, 1) + String(".") + gname(func, slot(p_ip, 3)) + String(" = ") + addr(p_ip, 2);
 
 			case OPCODE_CALL:
 			case OPCODE_CALL_RETURN:
@@ -356,20 +380,20 @@ struct Renderer {
 			}
 
 			case OPCODE_JUMP:
-				return String("jump -> ") + String::num_int64(a1);
+				return String("jump -> ") + String::num_int64(slot(p_ip, 1));
 			case OPCODE_JUMP_IF:
-				return "if " + addr(p_ip, 1) + String(" -> ") + String::num_int64(a2);
+				return "if " + addr(p_ip, 1) + String(" -> ") + String::num_int64(slot(p_ip, 2));
 			case OPCODE_JUMP_IF_NOT:
-				return "if not " + addr(p_ip, 1) + String(" -> ") + String::num_int64(a2);
+				return "if not " + addr(p_ip, 1) + String(" -> ") + String::num_int64(slot(p_ip, 2));
 			case OPCODE_JUMP_IF_SHARED:
-				return "if shared " + addr(p_ip, 1) + String(" -> ") + String::num_int64(a2);
+				return "if shared " + addr(p_ip, 1) + String(" -> ") + String::num_int64(slot(p_ip, 2));
 			case OPCODE_JUMP_TO_DEF_ARGUMENT:
 				return "jump to default argument";
 
 			case OPCODE_RETURN:
 				return "return " + addr(p_ip, 1);
 			case OPCODE_RETURN_TYPED_BUILTIN:
-				return "return " + addr(p_ip, 1) + String(" as ") + type_name(a2);
+				return "return " + addr(p_ip, 1) + String(" as ") + type_name(slot(p_ip, 2));
 			case OPCODE_RETURN_TYPED_NATIVE:
 				// Slot 2 is an address holding the native class constant, not a
 				// global-name index -- the engine prints it as DADDR(2).
@@ -384,7 +408,7 @@ struct Renderer {
 				return "return " + addr(p_ip, 1) +
 						(p_op == OPCODE_RETURN_TYPED_ARRAY ? String(" as Array") : String(" as Dictionary"));
 			case OPCODE_RETURN_TYPED_SCRIPT:
-				return "return " + addr(p_ip, 1) + String(" as script ") + quote_variant(func.get_constant(a2 & kAddrMask));
+				return "return " + addr(p_ip, 1) + String(" as script ") + quote_variant(func.get_constant(slot(p_ip, 2) & kAddrMask));
 
 			case OPCODE_AWAIT:
 				return "await " + addr(p_ip, 1);
@@ -392,7 +416,7 @@ struct Renderer {
 				return addr(p_ip, 1) + String(" = await resumed");
 
 			case OPCODE_LINE:
-				return String("line ") + String::num_int64(a1);
+				return String("line ") + String::num_int64(slot(p_ip, 1));
 			case OPCODE_END:
 				return "end";
 			case OPCODE_BREAKPOINT:
@@ -401,9 +425,9 @@ struct Renderer {
 				return "assert " + addr(p_ip, 1) + String(", ") + addr(p_ip, 2);
 
 			case OPCODE_STORE_GLOBAL:
-				return addr(p_ip, 1) + String(" = global(") + gname(func, a2) + String(")");
+				return addr(p_ip, 1) + String(" = global(") + gname(func, slot(p_ip, 2)) + String(")");
 			case OPCODE_STORE_NAMED_GLOBAL:
-				return addr(p_ip, 1) + String(" = named_global(") + gname(func, a2) + String(")");
+				return addr(p_ip, 1) + String(" = named_global(") + gname(func, slot(p_ip, 2)) + String(")");
 
 			case OPCODE_CREATE_LAMBDA:
 			case OPCODE_CREATE_SELF_LAMBDA: {
@@ -415,7 +439,7 @@ struct Renderer {
 				//     lambda index   = code[ip0+3+N]
 				// Reading the lambda index one slot too far produced a wild
 				// `lambdas[]` dereference that crashed the editor.
-				const int n = a1;
+				const int n = slot(p_ip, 1);
 				const int captures_count = slot(p_ip, 2 + n);
 				const int lambda_index = slot(p_ip, 3 + n);
 
@@ -537,6 +561,72 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 
 	listing.ok = true;
 	return listing;
+}
+
+String check_fixed_operands(Script *p_script) {
+	ScriptMirror mirror;
+	String error;
+	if (!ScriptMirror::bind(p_script, mirror, error)) {
+		return error;
+	}
+
+	List<ScriptMirror::Entry> entries;
+	mirror.collect_functions(entries, String(p_script->get_global_name()));
+
+	int checked = 0;
+	int bad = 0;
+	String report;
+	for (const ScriptMirror::Entry &E : entries) {
+		const ScriptMirror owner(E.owner);
+		const int *code = E.function.code();
+		const int size = E.function.code_size();
+		if (code == nullptr || size <= 0) {
+			continue;
+		}
+		Renderer renderer(E.function, owner, code, size);
+		int ip = 0;
+		while (ip < size) {
+			const int op = code[ip];
+			if (op < 0 || op >= kOpcodeCount) {
+				break;
+			}
+			const int length = instruction_length(op, code, ip);
+			if (length <= 0 || ip + length > size) {
+				break;
+			}
+
+			renderer.read_addr = 0;
+			renderer.read_imm = 0;
+			renderer.render(op, ip);
+
+			const FixedPlan plan = fixed_plan(op, ip);
+			if (plan.addr_count > 0 || plan.imm_count > 0) {
+				uint32_t want_addr = 0;
+				uint32_t want_imm = 0;
+				for (int i = 0; i < plan.addr_count; i++) {
+					want_addr |= Renderer::bit(plan.addr[i] - ip);
+				}
+				for (int i = 0; i < plan.imm_count; i++) {
+					want_imm |= Renderer::bit(plan.imm[i] - ip);
+				}
+				// Reading a slot the engine does not read, or reading it as the
+				// wrong kind, both mean this case has drifted.
+				const uint32_t excess = (renderer.read_addr & ~want_addr) | (renderer.read_imm & ~want_imm);
+				checked++;
+				if (excess != 0) {
+					bad++;
+					report += vformat("%s @%d %s: read addr=0x%x imm=0x%x, engine addr=0x%x imm=0x%x\n",
+							E.path, ip, opcode_name(op), renderer.read_addr, renderer.read_imm, want_addr, want_imm);
+				}
+			}
+			ip += length;
+		}
+	}
+
+	if (bad == 0) {
+		return String();
+	}
+	return vformat("%d of %d instructions disagree with the engine:\n%s", bad, checked, report);
 }
 
 bool disassemble_script(Script *p_script, String &r_text, String &r_error) {
