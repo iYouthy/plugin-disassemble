@@ -30,8 +30,10 @@ private:
 	void _refresh();
 
 	// The Script Editor owns `menu_hb` and `script_split` as private members, so
-	// they are found structurally. Returns null if the layout is not the one this
-	// plugin knows how to extend.
+	// they are found structurally -- by shape, not by depth, so that a restructure
+	// which keeps the shape but moves it deeper still works. Returns null if the
+	// layout is not the one this plugin knows how to extend.
+	Control *_find_child_of_layout(bool p_want_split) const;
 	Control *_find_menu_bar() const;
 	Control *_find_script_split() const;
 

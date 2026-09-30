@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/h_box_container.hpp>
 #include <godot_cpp/classes/h_split_container.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 #include "bytecode/disassembler.h"
 
@@ -18,47 +19,84 @@ GDScriptDisassemblePlugin::GDScriptDisassemblePlugin() {}
 
 GDScriptDisassemblePlugin::~GDScriptDisassemblePlugin() {}
 
-// The Script Editor is a PanelContainer holding a VBoxContainer ("main
-// container"), whose first child is the horizontal menu bar and whose second is
-// the HSplitContainer that splits [file list | code editor]. Both are private
-// C++ members with no accessor, so they are found by shape. Looking children up
-// by type rather than by index keeps this working when the editor inserts
-// another button into the menu bar, which it already does lazily for the
-// Edit/Go To menus.
-Control *GDScriptDisassemblePlugin::_find_menu_bar() const {
-	if (_script_editor == nullptr) {
+// The script editor's layout container holds both the toolbar row and the split
+// that contains the code editor. It is found by *shape* rather than by a fixed
+// depth, because that shape is what survives a restructure:
+//
+//   4.7  ScriptEditor (PanelContainer) -> VBoxContainer -> [HBox(menu), HSplit]
+//   4.8  ScriptEditor (EditorDock) -> DocumentEditorContainer -> VBoxContainer -> same
+//
+// The same VBox simply moved one level down when the script editor was rebuilt
+// on EditorDock, and menu_hb / script_split moved with it out of ScriptEditor
+// into DocumentEditorContainer. Matching on the shape covers both without a
+// version check.
+static VBoxContainer *find_layout_box(Node *p_root, int p_depth) {
+	if (p_root == nullptr || p_depth > 4) {
 		return nullptr;
 	}
-	for (int i = 0; i < _script_editor->get_child_count(); i++) {
-		VBoxContainer *main_container = Object::cast_to<VBoxContainer>(_script_editor->get_child(i));
-		if (main_container == nullptr) {
-			continue;
-		}
-		for (int j = 0; j < main_container->get_child_count(); j++) {
-			if (Object::cast_to<HBoxContainer>(main_container->get_child(j)) != nullptr) {
-				return Object::cast_to<Control>(main_container->get_child(j));
+	for (int i = 0; i < p_root->get_child_count(); i++) {
+		Node *child = p_root->get_child(i);
+		VBoxContainer *box = Object::cast_to<VBoxContainer>(child);
+		if (box != nullptr) {
+			bool has_toolbar = false;
+			bool has_split = false;
+			for (int j = 0; j < box->get_child_count(); j++) {
+				if (Object::cast_to<HBoxContainer>(box->get_child(j)) != nullptr) {
+					has_toolbar = true;
+				}
+				if (Object::cast_to<HSplitContainer>(box->get_child(j)) != nullptr) {
+					has_split = true;
+				}
 			}
+			if (has_toolbar && has_split) {
+				return box;
+			}
+		}
+		if (VBoxContainer *found = find_layout_box(child, p_depth + 1)) {
+			return found;
 		}
 	}
 	return nullptr;
 }
 
-Control *GDScriptDisassemblePlugin::_find_script_split() const {
-	if (_script_editor == nullptr) {
+// Printed when the layout cannot be found, so a future restructure is
+// diagnosable from the console instead of looking like the plugin silently
+// doing nothing.
+static void print_node_tree(Node *p_node, int p_depth) {
+	if (p_node == nullptr || p_depth > 5) {
+		return;
+	}
+	String indent;
+	for (int i = 0; i < p_depth; i++) {
+		indent += String("  ");
+	}
+	UtilityFunctions::print(indent, p_node->get_class(), " \"", p_node->get_name(), "\"");
+	for (int i = 0; i < p_node->get_child_count(); i++) {
+		print_node_tree(p_node->get_child(i), p_depth + 1);
+	}
+}
+
+Control *GDScriptDisassemblePlugin::_find_child_of_layout(bool p_want_split) const {
+	VBoxContainer *box = find_layout_box(_script_editor, 0);
+	if (box == nullptr) {
 		return nullptr;
 	}
-	for (int i = 0; i < _script_editor->get_child_count(); i++) {
-		VBoxContainer *main_container = Object::cast_to<VBoxContainer>(_script_editor->get_child(i));
-		if (main_container == nullptr) {
-			continue;
-		}
-		for (int j = 0; j < main_container->get_child_count(); j++) {
-			if (Object::cast_to<HSplitContainer>(main_container->get_child(j)) != nullptr) {
-				return Object::cast_to<Control>(main_container->get_child(j));
-			}
+	for (int j = 0; j < box->get_child_count(); j++) {
+		Node *child = box->get_child(j);
+		if (p_want_split ? (Object::cast_to<HSplitContainer>(child) != nullptr)
+						 : (Object::cast_to<HBoxContainer>(child) != nullptr)) {
+			return Object::cast_to<Control>(child);
 		}
 	}
 	return nullptr;
+}
+
+Control *GDScriptDisassemblePlugin::_find_menu_bar() const {
+	return _find_child_of_layout(false);
+}
+
+Control *GDScriptDisassemblePlugin::_find_script_split() const {
+	return _find_child_of_layout(true);
 }
 
 void GDScriptDisassemblePlugin::_enter_tree() {
@@ -74,7 +112,12 @@ void GDScriptDisassemblePlugin::_enter_tree() {
 
 	Control *menu_bar = _find_menu_bar();
 	if (menu_bar == nullptr) {
-		WARN_PRINT("GDScript Disassemble: could not find the script editor menu bar; the plugin will do nothing.");
+		// Print the actual tree rather than just giving up: when the editor
+		// restructures this layout (as 4.8 does), this output is what makes the
+		// difference between a five-minute fix and guessing.
+		WARN_PRINT("GDScript Disassemble: could not find the script editor layout; the plugin will do nothing. "
+				   "The tree it searched follows.");
+		print_node_tree(_script_editor, 0);
 		return;
 	}
 

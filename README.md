@@ -149,6 +149,44 @@ built-in utility. A declared `func absf(i: int)` does *not* shadow the built-in
 method and the call appears. Verified against the raw instruction stream, not
 just the rendered listing, so it is the engine's output and not a decoder bug.
 
+## Moving to a newer engine
+
+Everything below is per engine version, because the layout table is compiled in:
+one binary describes one engine build. 4.7.2 -> 4.8-dev was measured while
+writing this, and all 62 layout constants were **identical**; only the version
+string differed. So the data layer may well carry over unchanged, but the gate
+will not let it, by design.
+
+1. **Regenerate the tables** against the new tree:
+   ```bash
+   for t in gen_layout gen_opcodes gen_instruction_sizes gen_operand_plan; do
+       python3 tools/$t.py --godot <new-tree>
+   done
+   ```
+   The generators fail loudly if the engine's source no longer has the shape they
+   parse (`did the engine refactor...`), rather than extracting nonsense.
+2. **godot-cpp**: `supported_api_versions` tops out at 4.7, so a newer engine
+   needs `custom_api_file=` pointing at a dump from that engine
+   (`godot --dump-extension-api`).
+3. **Rebuild and run** `tests/test_edge.gd`. It carries the operand self-test, the
+   fallback probe, and the feature assertions — which between them cover the
+   things a restructure tends to break.
+4. **Check the UI still mounts.** The plugin finds the script editor's layout
+   container *by shape* (a VBoxContainer holding both an HBoxContainer and an
+   HSplitContainer) rather than by depth, so a restructure that keeps that shape
+   still works. 4.8 moves the same VBox one level deeper and this was written to
+   survive that. If it does not fit, `_enter_tree` prints the whole node tree it
+   searched before giving up.
+
+### Two gates disagreeing today
+
+`compatibility_minimum = "4.7"` lets the editor load the plugin on any 4.7.x,
+but the layout gate compares the full `"4.7.2"` string, so 4.7.0 and 4.7.1 get
+loaded and then refused. Either raise the manifest to `"4.7.2"` or relax the
+gate to compare major.minor only — but relaxing it trades a hard safety boundary
+for convenience, and the runtime checks it would fall back on, while strong, are
+not a proof.
+
 ## Known limitations
 
 - **Object constants are opaque.** A `preload(...)` or a script type in a typed
