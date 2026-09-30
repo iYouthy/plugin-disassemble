@@ -1,57 +1,27 @@
 [configuration]
 
-entry_symbol = "example_library_init"
-compatibility_minimum = "4.1"
+entry_symbol = "gdscript_disassemble_library_init"
+; The bytecode reader depends on the engine's C++ struct layout, so it only
+; claims support for the engine it was built and verified against.
+compatibility_minimum = "4.7"
 reloadable = false
 
 [libraries]
 ; Relative paths ensure that our GDExtension can be placed anywhere in the project directory.
-macos.single.debug = "./macos/libgdscript-disassemble.macos.template_debug.dylib"
-macos.double.debug = "./macos/libgdscript-disassemble.macos.template_debug.double.dylib"
-macos.single.release = "./macos/libgdscript-disassemble.macos.template_release.dylib"
-macos.double.release = "./macos/libgdscript-disassemble.macos.template_release.double.dylib"
 
-ios.arm64.single.debug = "./ios/libgdscript-disassemble.ios.template_debug.arm64.dylib"
-ios.arm64.double.debug = "./ios/libgdscript-disassemble.ios.template_debug.arm64.double.dylib"
-ios.arm64.single.release = "./ios/libgdscript-disassemble.ios.template_release.arm64.dylib"
-ios.arm64.double.release = "./ios/libgdscript-disassemble.ios.template_release.arm64.double.dylib"
+; macOS -- built with `scons arch=arm64`
+macos.debug.arm64 = "./macos/libgdscript-disassemble.macos.template_debug.arm64.dylib"
+macos.release.arm64 = "./macos/libgdscript-disassemble.macos.template_release.arm64.dylib"
+; macOS -- built with the default universal arch
+macos.debug = "./macos/libgdscript-disassemble.macos.template_debug.universal.dylib"
+macos.release = "./macos/libgdscript-disassemble.macos.template_release.universal.dylib"
 
-windows.x86_32.single.debug = "./windows/gdscript-disassemble.windows.template_debug.x86_32.dll"
-windows.x86_32.double.debug = "./windows/gdscript-disassemble.windows.template_debug.x86_32.double.dll"
-windows.x86_32.single.release = "./windows/gdscript-disassemble.windows.template_release.x86_32.dll"
-windows.x86_32.double.release = "./windows/gdscript-disassemble.windows.template_release.x86_32.double.dll"
+; Linux
+linux.x86_64.debug = "./linux/libgdscript-disassemble.linux.template_debug.x86_64.so"
+linux.x86_64.release = "./linux/libgdscript-disassemble.linux.template_release.x86_64.so"
+linux.arm64.debug = "./linux/libgdscript-disassemble.linux.template_debug.arm64.so"
+linux.arm64.release = "./linux/libgdscript-disassemble.linux.template_release.arm64.so"
 
-windows.x86_64.single.debug = "./windows/gdscript-disassemble.windows.template_debug.x86_64.dll"
-windows.x86_64.double.debug = "./windows/gdscript-disassemble.windows.template_debug.x86_64.double.dll"
-windows.x86_64.single.release = "./windows/gdscript-disassemble.windows.template_release.x86_64.dll"
-windows.x86_64.double.release = "./windows/gdscript-disassemble.windows.template_release.x86_64.double.dll"
-
-linux.x86_64.single.debug = "./linux/libgdscript-disassemble.linux.template_debug.x86_64.so"
-linux.x86_64.double.debug = "./linux/libgdscript-disassemble.linux.template_debug.x86_64.double.so"
-linux.x86_64.single.release = "./linux/libgdscript-disassemble.linux.template_release.x86_64.so"
-linux.x86_64.double.release = "./linux/libgdscript-disassemble.linux.template_release.x86_64.double.so"
-
-linux.arm64.single.debug = "./linux/libgdscript-disassemble.linux.template_debug.arm64.so"
-linux.arm64.double.debug = "./linux/libgdscript-disassemble.linux.template_debug.arm64.double.so"
-linux.arm64.single.release = "./linux/libgdscript-disassemble.linux.template_release.arm64.so"
-linux.arm64.double.release = "./linux/libgdscript-disassemble.linux.template_release.arm64.double.so"
-
-linux.rv64.single.debug = "./linux/libgdscript-disassemble.linux.template_debug.rv64.so"
-linux.rv64.double.debug = "./linux/libgdscript-disassemble.linux.template_debug.rv64.double.so"
-linux.rv64.single.release = "./linux/libgdscript-disassemble.linux.template_release.rv64.so"
-linux.rv64.double.release = "./linux/libgdscript-disassemble.linux.template_release.rv64.double.so"
-
-android.x86_64.single.debug = "./android/libgdscript-disassemble.android.template_debug.x86_64.so"
-android.x86_64.double.debug = "./android/libgdscript-disassemble.android.template_debug.x86_64.double.so"
-android.x86_64.single.release = "./android/libgdscript-disassemble.android.template_release.x86_64.so"
-android.x86_64.double.release = "./android/libgdscript-disassemble.android.template_release.x86_64.double.so"
-
-android.arm64.single.debug = "./android/libgdscript-disassemble.android.template_debug.arm64.so"
-android.arm64.double.debug = "./android/libgdscript-disassemble.android.template_debug.arm64.double.so"
-android.arm64.single.release = "./android/libgdscript-disassemble.android.template_release.arm64.so"
-android.arm64.double.release = "./android/libgdscript-disassemble.android.template_release.arm64.double.so"
-
-web.wasm32.single.debug = "./web/libgdscript-disassemble.web.template_debug.wasm32.nothreads.wasm"
-web.wasm32.double.debug = "./web/libgdscript-disassemble.web.template_debug.wasm32.double.nothreads.wasm"
-web.wasm32.single.release = "./web/libgdscript-disassemble.web.template_release.wasm32.nothreads.wasm"
-web.wasm32.double.release = "./web/libgdscript-disassemble.web.template_release.wasm32.double.nothreads.wasm"
+; Windows
+windows.x86_64.debug = "./windows/gdscript-disassemble.windows.template_debug.x86_64.dll"
+windows.x86_64.release = "./windows/gdscript-disassemble.windows.template_release.x86_64.dll"
