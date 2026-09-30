@@ -40,11 +40,6 @@ func _initialize() -> void:
 		if not c.contains(probe):
 			failures.append("construct missing: " + probe)
 
-	if failures.is_empty():
-		print("NESTED OK")
-	else:
-		for f in failures:
-			print("NESTED FAIL: ", f)
 	# 迭代与带类型的返回：这两个操作数位置曾经用错（步长被当成上界）。
 	var iter: String = dumper.disassemble(load("res://tests/example.gd"))
 	if not iter.contains("in range to "):
@@ -66,6 +61,26 @@ func _initialize() -> void:
 			if text.contains(fb):
 				failures.append("unresolved '%s' in %s" % [fb, name])
 
+	# 源码行号列：只要函数里出现了 line 指令，它的每一行就该有行号。曾经因为删
+	# 代码块时误删了 OPCODE_LINE 的记录，整个 @implicit_initializer 的行号列
+	# 变成 "-"，而当时所有断言都没发现。
+	# 注意不能要求所有函数都有行号：空的隐式初始化器只有一条 end，本来就没有。
+	for name in ["example", "constructs", "nested", "objects"]:
+		var blocks: PackedStringArray = dumper.disassemble(load("res://tests/%s.gd" % name)).split("--- ")
+		for b in blocks:
+			var body: PackedStringArray = b.split("\n")
+			var has_line_instr := false
+			for l in body:
+				if l.contains(" line "):
+					has_line_instr = true
+					break
+			if not has_line_instr:
+				continue
+			for l in body:
+				if l.length() > 14 and l.substr(0, 6).strip_edges() == "-":
+					failures.append("missing source line in %s: %s" % [name, l.strip_edges()])
+					break
+
 	# 操作数自检：把渲染器实际读取的槽位/类型与引擎声明的比对。这条抓到过
 	# ASSIGN_TYPED_ARRAY / _DICTIONARY 完全没有实现（掉进原始槽位转储）。
 	for name in ["example", "constructs", "nested", "objects", "tool_script", "empty"]:
@@ -73,4 +88,9 @@ func _initialize() -> void:
 		if not r.is_empty():
 			failures.append("operand self-test on %s:\n%s" % [name, r])
 
+	if failures.is_empty():
+		print("NESTED OK")
+	else:
+		for f in failures:
+			print("NESTED FAIL: ", f)
 	quit(0 if failures.is_empty() else 1)

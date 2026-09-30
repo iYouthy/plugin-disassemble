@@ -554,6 +554,13 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 		ins.length = length;
 		ins.text = renderer.render(opcode, ip);
 
+		// The line a source line applies to. Applying it *to* the OPCODE_LINE that
+		// carries it is what makes functions whose initial line is 0 (the
+		// synthesised `@implicit_initializer`) show a line at all.
+		if (opcode == OPCODE_LINE) {
+			ins.source_line = code[ip + 1];
+		}
+
 		listing.instructions.push_back(ins);
 
 		ip += length;
