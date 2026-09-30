@@ -32,6 +32,9 @@ public:
 	// Test hook: checks the hand-written fixed-shape rendering cases against the
 	// operand reads the engine declares. Returns "" when everything agreed.
 	String self_test(const Ref<Script> &p_script) const;
+
+	// TEMPORARY DIAGNOSTIC.
+	String probe_object_names(const Ref<Script> &p_script, int32_t p_step) const;
 };
 
 } // namespace godot

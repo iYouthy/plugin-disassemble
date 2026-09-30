@@ -12,6 +12,7 @@ void GDScriptBytecodeDumper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_layout_supported"), &GDScriptBytecodeDumper::is_layout_supported);
 	ClassDB::bind_method(D_METHOD("get_layout_info"), &GDScriptBytecodeDumper::get_layout_info);
 	ClassDB::bind_method(D_METHOD("self_test", "script"), &GDScriptBytecodeDumper::self_test);
+	ClassDB::bind_method(D_METHOD("probe_object_names", "script", "step"), &GDScriptBytecodeDumper::probe_object_names);
 }
 
 bool GDScriptBytecodeDumper::is_layout_supported() const {
@@ -29,6 +30,10 @@ String GDScriptBytecodeDumper::self_test(const Ref<Script> &p_script) const {
 		return String("only GDScript is supported");
 	}
 	return gdscript_disassemble::check_fixed_operands(p_script.ptr());
+}
+
+String GDScriptBytecodeDumper::probe_object_names(const Ref<Script> &p_script, int32_t p_step) const {
+	return gdscript_disassemble::probe_object_names(p_script.ptr(), p_step);
 }
 
 String GDScriptBytecodeDumper::get_layout_info() const {

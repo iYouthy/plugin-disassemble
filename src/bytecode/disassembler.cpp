@@ -563,6 +563,76 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 	return listing;
 }
 
+
+// TEMPORARY DIAGNOSTIC -- not part of the product path. Isolates which step of
+// resolving an object constant faults, by doing one step more each run and
+// printing before each so the output survives a crash.
+String probe_object_names(Script *p_script, int p_step) {
+	ScriptMirror mirror;
+	String err;
+	if (!ScriptMirror::bind(p_script, mirror, err)) {
+		return err;
+	}
+	List<ScriptMirror::Entry> entries;
+	mirror.collect_functions(entries, String(p_script->get_global_name()));
+
+	int seen = 0;
+	for (const ScriptMirror::Entry &E : entries) {
+		const FunctionView &f = E.function;
+		const int n = f.constant_count();
+		for (int i = 0; i < n; i++) {
+			const Variant v = f.get_constant(i);
+			if (v.get_type() != Variant::OBJECT) {
+				continue;
+			}
+			seen++;
+			UtilityFunctions::print("const ", i, " in ", E.path);
+
+			UtilityFunctions::print("  step0: taking the pointer...");
+			const void *obj = v.operator Object *();
+			UtilityFunctions::print("  step0 ok ptr=", (uint64_t)obj);
+
+			if (p_step < 1) {
+				continue;
+			}
+			UtilityFunctions::print("  step1: object_get_class_name...");
+			alignas(StringName) unsigned char storage[sizeof(StringName)];
+			const bool ok = ::godot::gdextension_interface::object_get_class_name(
+					obj, ::godot::gdextension_interface::library,
+					reinterpret_cast<GDExtensionUninitializedStringNamePtr>(storage));
+			UtilityFunctions::print("  step1 ok=", (int)ok);
+			if (!ok) {
+				continue;
+			}
+			const String cls = String(*reinterpret_cast<const StringName *>(storage));
+			UtilityFunctions::print("  step1 class=", cls);
+
+			if (p_step < 2) {
+				continue;
+			}
+			UtilityFunctions::print("  step2: local_name...");
+			if (cls == String("GDScript")) {
+				const StringName local = *reinterpret_cast<const StringName *>(
+						static_cast<const char *>(obj) + kLayout.kOff_GDScript_local_name);
+				UtilityFunctions::print("  step2 ok local=", String(local));
+			} else {
+				UtilityFunctions::print("  step2 skipped (not a GDScript)");
+			}
+
+			if (p_step < 3) {
+				continue;
+			}
+			UtilityFunctions::print("  step3: fully_qualified_name...");
+			if (cls == String("GDScript")) {
+				const String qualified = *reinterpret_cast<const String *>(
+						static_cast<const char *>(obj) + kLayout.kOff_GDScript_fully_qualified_name);
+				UtilityFunctions::print("  step3 ok fq=", qualified);
+			}
+		}
+	}
+	return vformat("probed %d object constants", seen);
+}
+
 String check_fixed_operands(Script *p_script) {
 	ScriptMirror mirror;
 	String error;

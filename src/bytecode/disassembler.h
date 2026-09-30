@@ -56,6 +56,9 @@ bool disassemble_script(Script *p_script, String &r_text, String &r_error);
 // unreadable when it mis-fired.
 String check_fixed_operands(Script *p_script);
 
+// TEMPORARY DIAGNOSTIC.
+String probe_object_names(Script *p_script, int p_step);
+
 // Renders an address operand (`index | type << 24`) the way the engine's own
 // disassembler does: self / stack(n) / const(...) / member(...).
 String render_address(const ScriptMirror &p_script, const FunctionView &p_function, int p_operand);
