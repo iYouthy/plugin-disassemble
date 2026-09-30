@@ -35,6 +35,9 @@ public:
 
 	// TEMPORARY DIAGNOSTIC.
 	String probe_object_names(const Ref<Script> &p_script, int32_t p_step) const;
+
+	// TEMPORARY DIAGNOSTIC.
+	String dump_raw_code(const Ref<Script> &p_script, const String &p_function) const;
 };
 
 } // namespace godot

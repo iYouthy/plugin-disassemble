@@ -641,6 +641,31 @@ String probe_object_names(Script *p_script, int p_step) {
 	return vformat("probed %d object constants", seen);
 }
 
+// TEMPORARY DIAGNOSTIC: the raw instruction ints, so a missing instruction can
+// be told apart from a decoder that skipped one.
+String dump_raw_code(Script *p_script, const String &p_function) {
+	ScriptMirror mirror;
+	String err;
+	if (!ScriptMirror::bind(p_script, mirror, err)) {
+		return err;
+	}
+	List<ScriptMirror::Entry> entries;
+	mirror.collect_functions(entries, String(p_script->get_global_name()));
+	for (const ScriptMirror::Entry &E : entries) {
+		if (String(E.name) != p_function) {
+			continue;
+		}
+		const int *code = E.function.code();
+		const int size = E.function.code_size();
+		String out = vformat("%s: code_size=%d\n  ", E.path, size);
+		for (int i = 0; i < size; i++) {
+			out += vformat("%d:%d ", i, code[i]);
+		}
+		return out;
+	}
+	return String("function not found");
+}
+
 String check_fixed_operands(Script *p_script) {
 	ScriptMirror mirror;
 	String error;

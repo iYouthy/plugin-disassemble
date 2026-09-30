@@ -57,6 +57,9 @@ bool disassemble_script(Script *p_script, String &r_text, String &r_error);
 String check_fixed_operands(Script *p_script);
 
 // TEMPORARY DIAGNOSTIC.
+String dump_raw_code(Script *p_script, const String &p_function);
+
+// TEMPORARY DIAGNOSTIC.
 String probe_object_names(Script *p_script, int p_step);
 
 // Renders an address operand (`index | type << 24`) the way the engine's own
