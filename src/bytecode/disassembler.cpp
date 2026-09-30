@@ -139,16 +139,33 @@ struct Renderer {
 	// A typed container's element/key/value type. The engine's precedence is
 	// script constant, then native class name, then built-in Variant type.
 	String type_descriptor_script(int p_script_slot) const {
-		// See the OBJECT branch of quote_variant: a script constant holds an
-		// engine pointer that cannot be safely resolved from here.
-		return p_script_slot >= 0 ? String("script(?)") : String();
+		if (p_script_slot < 0) {
+			return String();
+		}
+		const Variant v = func.get_constant(operand_at(p_script_slot) & kAddrMask);
+		if (v.get_type() != Variant::OBJECT) {
+			return String();
+		}
+		// A null pointer means the slot is unused, not that a script is there.
+		// That distinction is what keeps this from shadowing the native and
+		// built-in descriptors: a typed container of a *script* also records the
+		// script's native base class, so "the script slot exists" alone is not
+		// evidence of a script type.
+		//
+		// Reading the pointer is safe; resolving the object behind it is what
+		// crashes (see the OBJECT branch of quote_variant).
+		if (v.operator Object *() == nullptr) {
+			return String();
+		}
+		return String("script(?)");
 	}
 
 	String type_descriptor(int p_script_slot, int p_builtin_slot, int p_native_slot) const {
-		// The engine's precedence is script > native > built-in, but the script
-		// case cannot be resolved here (see type_descriptor_script), so it is
-		// checked last: whatever it would have said is reported as unknown only
-		// when nothing else names the type.
+		// The engine's precedence is script > native > built-in, and it has to be
+		// kept: a container of a script type also records that script's native
+		// base class, so checking native first would label `Array[MyScript]` as
+		// `Node[]`. type_descriptor_script only claims the slot when it really
+		// holds a script, which is what lets this order work without resolving it.
 		const String script_name = type_descriptor_script(p_script_slot);
 		if (!script_name.is_empty()) {
 			return script_name;

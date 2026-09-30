@@ -96,6 +96,13 @@ func _initialize() -> void:
 	if statics.contains("--- static b ---"):
 		failures.append("non-static function marked static")
 
+	# 类型描述符：原生类型、内置类型必须显示出真实名字，只有脚本类型才是未知。
+	# 曾经因为 script 分支永远抢先，把 Array[String] 也变成了 script(?)[ ]。
+	var demo: String = dumper.disassemble(load("res://tests/objdemo.gd"))
+	for probe in ["member(a) = Node[]", "member(b) = String[]", "member(c) = script(?)"]:
+		if not demo.contains(probe):
+			failures.append("type descriptor wrong, missing: " + probe)
+
 	if failures.is_empty():
 		print("NESTED OK")
 	else:
