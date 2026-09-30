@@ -6,11 +6,14 @@ to agree with the engine's enum order exactly. This reads the order straight out
 of the engine header rather than restating it by hand.
 """
 import argparse
+import os
 import re
 import sys
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--godot", required=True, help="engine source root")
+ap.add_argument("--check", action="store_true",
+                help="compare against the existing file instead of writing")
 ap.add_argument("-o", "--out", default="src/bytecode/opcodes.h")
 a = ap.parse_args()
 
@@ -65,5 +68,21 @@ L.append("")
 L.append("} // namespace gdscript_disassemble")
 L.append("} // namespace godot")
 L.append("")
-open(a.out, "w").write("\n".join(L))
+text = "\n".join(L)
+
+# `--check` exists so drift is detectable: these tables describe one engine
+# build, and a stale table reads wrong memory rather than failing outright.
+if a.check:
+    import difflib
+    if not os.path.exists(a.out):
+        sys.exit(a.out + " does not exist; nothing to check")
+    existing = open(a.out).read()
+    if existing == text:
+        print("OK: " + a.out + " is up to date with modules/gdscript/gdscript_function.h (opcode enum)")
+        sys.exit(0)
+    sys.stderr.writelines(difflib.unified_diff(
+        existing.splitlines(True), text.splitlines(True), a.out, "regenerated"))
+    sys.exit(a.out + " has drifted from modules/gdscript/gdscript_function.h (opcode enum); regenerate it")
+
+open(a.out, "w").write(text)
 print("wrote %s: %d opcodes" % (a.out, len(ops)))
