@@ -135,6 +135,20 @@ that the operand positions still agree with the engine.
 The other scripts in `tests/` only print, and are there for looking at output by
 eye.
 
+## Interpreting a listing
+
+A call can be missing from the listing, and that is not a decoding error. GDScript
+folds calls to **built-in utility functions** when the arguments are constant and
+the result is unused, and then drops the statement as a dead pure expression. So
+`absf(1)` or `abs(1)` written as a bare statement produce no instruction at all,
+while `print(1)` does, because `print` has side effects.
+
+This bites hardest when a script declares a method whose name collides with a
+built-in utility. A declared `func absf(i: int)` does *not* shadow the built-in
+`absf`, so `absf(1)` still resolves to the utility and disappears — rename the
+method and the call appears. Verified against the raw instruction stream, not
+just the rendered listing, so it is the engine's output and not a decoder bug.
+
 ## Known limitations
 
 - **Object constants are opaque.** A `preload(...)` or a script type in a typed
