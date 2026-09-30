@@ -128,18 +128,13 @@ struct Renderer {
 	}
 
 	String type_descriptor(int p_script_slot, int p_builtin_slot, int p_native_slot) const {
-		// The codegen fills exactly one of the three descriptors, so resolving
-		// native first, then built-in, is equivalent to the engine's own
-		// script > native > built-in precedence for everything it can name. The
-		// script case is the one we cannot resolve (see below), and it is
-		// therefore checked last.
-		// The engine's precedence is script > native > built-in, now that the
-		// script case can actually be resolved.
-		{
-			const String script_name = type_descriptor_script(p_script_slot);
-			if (!script_name.is_empty()) {
-				return script_name;
-			}
+		// The engine's precedence is script > native > built-in, but the script
+		// case cannot be resolved here (see type_descriptor_script), so it is
+		// checked last: whatever it would have said is reported as unknown only
+		// when nothing else names the type.
+		const String script_name = type_descriptor_script(p_script_slot);
+		if (!script_name.is_empty()) {
+			return script_name;
 		}
 		if (p_native_slot >= 0) {
 			const String native = String(func.get_global_name(operand_at(p_native_slot)));
@@ -151,12 +146,6 @@ struct Renderer {
 			const String builtin = type_name(operand_at(p_builtin_slot));
 			if (builtin != String("Nil")) {
 				return builtin;
-			}
-		}
-		if (p_script_slot >= 0) {
-			const Variant v = func.get_constant(operand_at(p_script_slot) & kAddrMask);
-			if (v.get_type() == Variant::OBJECT) {
-	
 			}
 		}
 		return String();
@@ -540,9 +529,7 @@ FunctionListing disassemble_function(const FunctionView &p_function, const Scrip
 		ins.opcode = opcode;
 		ins.length = length;
 		ins.text = renderer.render(opcode, ip);
-		if (opcode == OPCODE_LINE) {
-			ins.source_line = code[ip + 1];
-		}
+
 		listing.instructions.push_back(ins);
 
 		ip += length;

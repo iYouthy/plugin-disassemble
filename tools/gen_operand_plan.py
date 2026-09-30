@@ -61,9 +61,28 @@ if pending:
     sys.exit("stacked case labels with no body: %s" % ", ".join(pending))
 
 plans = {}
+fixed = {}
 for name, chunk in chunks.items():
     if "++ip" not in chunk:
-        continue  # fixed-shape instruction; the generic renderer handles it
+        # Fixed-shape instruction: every operand is at a constant offset, so the
+        # only thing worth extracting is *which* offsets the engine reads and
+        # whether each is an address operand or a raw int. Getting that kind
+        # wrong is a real bug class -- reading an address slot as a name index
+        # silently yields a wrong value rather than an obvious failure.
+        addrs, imms = [], []
+        for m in re.finditer(r"DADDR\(\s*(\d+)\s*\)", chunk):
+            k = int(m.group(1))
+            if k not in addrs:
+                addrs.append(k)
+        # `_code_ptr[ip + k]` only appears for reads that are NOT addresses;
+        # DADDR's expansion is not visible in the source text.
+        for m in re.finditer(r"_code_ptr\[ip\s*\+\s*(\d+)\]", chunk):
+            k = int(m.group(1))
+            if k not in imms:
+                imms.append(k)
+        if addrs or imms:
+            fixed[name] = (addrs, imms)
+        continue
 
     # The count variable: `int X = _code_ptr[ip + K + instr_var_args];`
     m = re.search(r"\bint\s+(\w+)\s*=\s*_code_ptr\[ip\s*\+\s*(\d+)\s*\+\s*instr_var_args\];", chunk)
@@ -201,6 +220,38 @@ for name in sorted(plans):
                 slot, mul = types[host][role]
                 expr.append("plan.%s_%s = ip0 + %d + code[plan.argc] * %d;" % (host, role, slot, mul))
     L.append("\t\tcase %s: { %s } break;" % (name, " ".join(expr)))
+L.append("\t\tdefault: break;")
+L.append("\t}")
+L.append("\treturn plan;")
+L.append("}")
+L.append("")
+L.append("// Operands of the fixed-shape instructions, split by kind. Positions are")
+L.append("// in the order the engine reads them, so the order *is* the engine's, not a")
+L.append("// restatement of it.")
+L.append("//")
+L.append("// The kind matters as much as the position: an address operand and a raw int")
+L.append("// are read through the same slot but mean different things, and reading one as")
+L.append("// the other yields a plausible-looking wrong value.")
+L.append("struct FixedPlan {")
+L.append("\tint addr[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };")
+L.append("\tint addr_count = 0;")
+L.append("\tint imm[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };")
+L.append("\tint imm_count = 0;")
+L.append("};")
+L.append("")
+L.append("inline FixedPlan fixed_plan(int p_opcode, int ip0) {")
+L.append("\tFixedPlan plan;")
+L.append("\tswitch (p_opcode) {")
+for _name in sorted(fixed):
+    _addrs, _imms = fixed[_name]
+    _parts = []
+    for _i, _k in enumerate(_addrs[:8]):
+        _parts.append("plan.addr[%d] = ip0 + %d;" % (_i, _k))
+    _parts.append("plan.addr_count = %d;" % min(len(_addrs), 8))
+    for _i, _k in enumerate(_imms[:8]):
+        _parts.append("plan.imm[%d] = ip0 + %d;" % (_i, _k))
+    _parts.append("plan.imm_count = %d;" % min(len(_imms), 8))
+    L.append("\t\tcase %s: { %s } break;" % (_name, " ".join(_parts)))
 L.append("\t\tdefault: break;")
 L.append("\t}")
 L.append("\treturn plan;")

@@ -63,5 +63,80 @@ inline OperandPlan operand_plan(int p_opcode, const int *code, int ip0) {
 	return plan;
 }
 
+// Operands of the fixed-shape instructions, split by kind. Positions are
+// in the order the engine reads them, so the order *is* the engine's, not a
+// restatement of it.
+//
+// The kind matters as much as the position: an address operand and a raw int
+// are read through the same slot but mean different things, and reading one as
+// the other yields a plausible-looking wrong value.
+struct FixedPlan {
+	int addr[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int addr_count = 0;
+	int imm[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int imm_count = 0;
+};
+
+inline FixedPlan fixed_plan(int p_opcode, int ip0) {
+	FixedPlan plan;
+	switch (p_opcode) {
+		case OPCODE_ASSERT: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_FALSE: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_NULL: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_TRUE: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_TYPED_ARRAY: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_TYPED_BUILTIN: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_ASSIGN_TYPED_DICTIONARY: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_TYPED_NATIVE: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_ASSIGN_TYPED_SCRIPT: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_AWAIT: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_AWAIT_RESUME: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_CAST_TO_BUILTIN: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr_count = 2; plan.imm[0] = ip0 + 1; plan.imm_count = 1; } break;
+		case OPCODE_CAST_TO_NATIVE: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_CAST_TO_SCRIPT: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_GET_INDEXED_VALIDATED: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_GET_KEYED: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_GET_KEYED_VALIDATED: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_GET_MEMBER: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_GET_NAMED: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_GET_NAMED_VALIDATED: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_GET_STATIC_VARIABLE: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm[1] = ip0 + 3; plan.imm_count = 2; } break;
+		case OPCODE_ITERATE: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 1; plan.addr_count = 3; plan.imm[0] = ip0 + 4; plan.imm_count = 1; } break;
+		case OPCODE_ITERATE_BEGIN: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 1; plan.addr_count = 3; plan.imm[0] = ip0 + 4; plan.imm_count = 1; } break;
+		case OPCODE_ITERATE_BEGIN_RANGE: { plan.addr[0] = ip0 + 5; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr[3] = ip0 + 4; plan.addr[4] = ip0 + 1; plan.addr_count = 5; plan.imm[0] = ip0 + 6; plan.imm_count = 1; } break;
+		case OPCODE_ITERATE_RANGE: { plan.addr[0] = ip0 + 4; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr[3] = ip0 + 1; plan.addr_count = 4; plan.imm[0] = ip0 + 5; plan.imm_count = 1; } break;
+		case OPCODE_JUMP: { plan.addr_count = 0; plan.imm[0] = ip0 + 1; plan.imm_count = 1; } break;
+		case OPCODE_JUMP_IF: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_JUMP_IF_NOT: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_JUMP_IF_SHARED: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_LINE: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 1; plan.imm_count = 1; } break;
+		case OPCODE_OPERATOR: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm[0] = ip0 + 4; plan.imm_count = 1; } break;
+		case OPCODE_OPERATOR_VALIDATED: { plan.addr[0] = ip0 + 3; plan.addr[1] = ip0 + 1; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm[0] = ip0 + 4; plan.imm_count = 1; } break;
+		case OPCODE_RETURN: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_RETURN_TYPED_ARRAY: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_RETURN_TYPED_BUILTIN: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_RETURN_TYPED_DICTIONARY: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm_count = 0; } break;
+		case OPCODE_RETURN_TYPED_NATIVE: { plan.addr[0] = ip0 + 2; plan.addr[1] = ip0 + 1; plan.addr_count = 2; plan.imm_count = 0; } break;
+		case OPCODE_RETURN_TYPED_SCRIPT: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 3; plan.addr[2] = ip0 + 2; plan.addr_count = 3; plan.imm[0] = ip0 + 2; plan.imm[1] = ip0 + 4; plan.imm_count = 2; } break;
+		case OPCODE_SET_INDEXED_VALIDATED: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_SET_KEYED: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_SET_KEYED_VALIDATED: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		case OPCODE_SET_MEMBER: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_SET_NAMED: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_SET_NAMED_VALIDATED: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_SET_STATIC_VARIABLE: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm[1] = ip0 + 3; plan.imm_count = 2; } break;
+		case OPCODE_STORE_GLOBAL: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_STORE_NAMED_GLOBAL: { plan.addr[0] = ip0 + 1; plan.addr_count = 1; plan.imm[0] = ip0 + 2; plan.imm_count = 1; } break;
+		case OPCODE_TYPE_TEST_ARRAY: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm[1] = ip0 + 4; plan.imm[2] = ip0 + 5; plan.imm_count = 3; } break;
+		case OPCODE_TYPE_TEST_BUILTIN: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_TYPE_TEST_DICTIONARY: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm[1] = ip0 + 5; plan.imm[2] = ip0 + 6; plan.imm[3] = ip0 + 4; plan.imm[4] = ip0 + 7; plan.imm[5] = ip0 + 8; plan.imm_count = 6; } break;
+		case OPCODE_TYPE_TEST_NATIVE: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr_count = 2; plan.imm[0] = ip0 + 3; plan.imm_count = 1; } break;
+		case OPCODE_TYPE_TEST_SCRIPT: { plan.addr[0] = ip0 + 1; plan.addr[1] = ip0 + 2; plan.addr[2] = ip0 + 3; plan.addr_count = 3; plan.imm_count = 0; } break;
+		default: break;
+	}
+	return plan;
+}
+
 } // namespace gdscript_disassemble
 } // namespace godot
