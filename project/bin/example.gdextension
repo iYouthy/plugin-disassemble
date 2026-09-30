@@ -3,7 +3,7 @@
 entry_symbol = "gdscript_disassemble_library_init"
 ; The bytecode reader depends on the engine's C++ struct layout, so it only
 ; claims support for the engine it was built and verified against.
-compatibility_minimum = "4.7"
+compatibility_minimum = "4.7.2"
 reloadable = false
 
 [libraries]

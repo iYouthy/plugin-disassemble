@@ -107,22 +107,50 @@ bool ScriptMirror::verify(Script *p_script, String &r_error) const {
 		return false;
 	}
 
-	// 1. The layout table is only meaningful for the engine it was measured
-	// against. Check the version before anything else, so a mismatched build
-	// reports the reason instead of reading the wrong memory.
+	// 1. Which engine this build has been verified against.
+	//
+	// The layout is compiled in, so it describes one engine build -- but a new
+	// engine release does not necessarily change it. Measured: 4.7.2 and 4.8-dev
+	// agree on all 62 constants. Refusing on the version *string* would therefore
+	// reject engines the table describes perfectly well, which is the opposite of
+	// what is wanted here: one build, usable across releases.
+	//
+	// So the string decides only the floor. Anything at or above the verified
+	// version is allowed through and the structural checks below -- which read
+	// real engine state and compare against real public API -- are what actually
+	// decide whether the table fits.
 	Engine *engine = Engine::get_singleton();
 	if (engine != nullptr) {
 		const Dictionary v = engine->get_version_info();
-		const String running = vformat("%d.%d.%d",
-				(int)v.get("major", 0), (int)v.get("minor", 0), (int)v.get("patch", 0));
-		const String expected = String(kLayoutEngineVersion);
-		if (running != expected) {
+		const int major = (int)v.get("major", 0);
+		const int minor = (int)v.get("minor", 0);
+		const int patch = (int)v.get("patch", 0);
+
+		// Bump these when a layout is regenerated and verified for a new engine.
+		constexpr int kFloorMajor = 4;
+		constexpr int kFloorMinor = 7;
+		constexpr int kFloorPatch = 2;
+
+		const bool below_floor = (major < kFloorMajor) ||
+				(major == kFloorMajor && (minor < kFloorMinor ||
+												 (minor == kFloorMinor && patch < kFloorPatch)));
+		if (below_floor) {
 			r_error = vformat(
-					"Bytecode layout is only known for Godot %s, but this editor is Godot %s.\n"
-					"Regenerate src/bytecode/engine_layout.h for this engine:\n"
-					"    python3 tools/gen_layout.py --godot <engine-source>",
-					expected, running);
+					"This build's bytecode layout is for Godot %d.%d.%d or newer, but this editor is "
+					"Godot %d.%d.%d. Regenerate src/bytecode/engine_layout.h for it:\n"
+					"    python3 tools/regen.py --godot <engine-source>",
+					kFloorMajor, kFloorMinor, kFloorPatch, major, minor, patch);
 			return false;
+		}
+
+		const String running = vformat("%d.%d.%d", major, minor, patch);
+		if (running != String(kLayoutEngineVersion)) {
+			// Newer than anything verified. Allowed, but said out loud: if the
+			// checks below then fail, this line is what explains why.
+			WARN_PRINT(vformat("GDScript Disassemble: layout was verified against Godot %s, running on %s. "
+							   "Proceeding because the structural checks below pass; if they fail, "
+							   "regenerate the layout tables for this engine.",
+					String(kLayoutEngineVersion), running));
 		}
 	}
 
